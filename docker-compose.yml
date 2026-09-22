@@ -1,0 +1,81 @@
+services:
+
+  # Jenkins CI/CD server
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: isec6000-jenkins
+
+    # Jenkins web interface and agent communication
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+
+    # Persistent Jenkins configuration, jobs, plugins and build data
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - docker_certs:/certs/client:ro
+
+    # Configure Jenkins to communicate securely with Docker-in-Docker
+    environment:
+      DOCKER_HOST: tcp://docker:2376
+      DOCKER_TLS_VERIFY: "1"
+      DOCKER_CERT_PATH: /certs/client
+
+    # Start Jenkins after the Docker daemon is healthy
+    depends_on:
+      docker:
+        condition: service_healthy
+
+    # Run Jenkins and Docker on an isolated network
+    networks:
+      - ci_network
+
+
+  # Docker-in-Docker service used to build application images
+  docker:
+    image: docker:29-dind
+    container_name: isec6000-dind
+
+    # DinD requires privileged mode to run its own Docker daemon
+    privileged: true
+
+    # Automatically generate TLS certificates for secure Docker communication
+    environment:
+      DOCKER_TLS_CERTDIR: /certs
+
+    # Persistent Docker image and container data
+    volumes:
+      - docker_data:/var/lib/docker
+      - docker_certs:/certs/client
+
+    # Isolated network shared with Jenkins
+    networks:
+      - ci_network
+
+    # Confirm that the Docker daemon is ready
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
+# Persistent storage volumes
+volumes:
+
+  # Stores Jenkins configuration, plugins, jobs and build information
+  jenkins_home:
+
+  # Stores Docker images and containers created by the CI pipeline
+  docker_data:
+
+  # Stores TLS certificates shared between Jenkins and DinD
+  docker_certs:
+
+
+# Private network used by Jenkins and Docker
+networks:
+  ci_network:
+    driver: bridge

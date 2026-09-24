@@ -32,35 +32,24 @@ services:
     networks:
       - ci_network
 
-
   # Docker-in-Docker service used to build application images
   docker:
     image: docker:29-dind
     container_name: isec6000-dind
-
-    # DinD requires privileged mode to run its own Docker daemon
     privileged: true
-
-    # Automatically generate TLS certificates for secure Docker communication
     environment:
       DOCKER_TLS_CERTDIR: /certs
-
-    # Persistent Docker image and container data
     volumes:
       - docker_data:/var/lib/docker
       - docker_certs:/certs/client
-
-    # Isolated network shared with Jenkins
+      - jenkins_home:/var/jenkins_home
     networks:
       - ci_network
-
-    # Confirm that the Docker daemon is ready
     healthcheck:
       test: ["CMD", "docker", "info"]
       interval: 5s
       timeout: 5s
       retries: 10
-
 
 # Persistent storage volumes
 volumes:
@@ -73,7 +62,6 @@ volumes:
 
   # Stores TLS certificates shared between Jenkins and DinD
   docker_certs:
-
 
 # Private network used by Jenkins and Docker
 networks:
